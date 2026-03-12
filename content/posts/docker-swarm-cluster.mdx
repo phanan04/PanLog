@@ -1,0 +1,72 @@
+---
+title: "Kiến trúc Docker Swarm Cluster Production"
+date: "2024-03-10"
+category: "DevOps"
+tags: ["docker", "swarm", "cluster"]
+excerpt: "Thiết lập một cụm Docker Swarm 3 Manager, 3 Worker cho môi trường production với Traefik làm Load Balancer."
+---
+
+# Docker Swarm Cluster
+
+Docker Swarm cung cấp giải pháp clustering native cho Docker, đơn giản nhưng mạnh mẽ hơn so với Kubernetes cho các hệ thống nhỏ và vừa.
+
+## Topology
+
+- **Managers**: `manager1` (Leader), `manager2`, `manager3`
+- **Workers**: `worker1`, `worker2`, `worker3`
+
+## Cài đặt Docker (Tất cả node)
+
+```bash
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+usermod -aG docker ubuntu
+```
+
+## Khởi tạo Swarm (Trên manager1)
+
+```bash
+docker swarm init --advertise-addr <IP_MANAGER1>
+```
+
+Đầu ra sẽ cung cấp cho bạn một chuỗi token dạng:
+
+```
+docker swarm join --token SWMTKN-1-xxxxxxxxxxxxxxxxxxxxxxx-yyyyyyyyyy <IP_MANAGER1>:2377
+```
+
+## Join các Manager và Worker
+
+- **Thêm Manager mới**: lấy token bằng lệnh `docker swarm join-token manager`
+- **Thêm Worker mới**: copy lệnh `join` bên trên và chạy ở các worker node.
+
+## Deploy Traefik Ingress Controller
+
+Traefik rất tốt cho Docker Swarm:
+
+```yaml
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v2.11
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker.swarmMode=true"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+```
+
+Lưu file với tên `traefik-stack.yml` và deploy:
+
+```bash
+docker stack deploy -c traefik-stack.yml proxy
+```

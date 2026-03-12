@@ -1,0 +1,61 @@
+---
+title: "Thiết kế VPC Tiêu chuẩn trên AWS với Terraform"
+date: "2024-03-08"
+category: "Cloud"
+tags: ["aws", "terraform", "vpc"]
+excerpt: "Sử dụng Infrastructure as Code với Terraform để cấu hình một VPC an toàn, High Availability (HA) theo best practices AWS."
+---
+
+# Kiến trúc Mạng Đám Mây (AWS VPC)
+
+Một VPC chuẩn theo AWS Best Practices cho môi trường Production:
+- 1 VPC CIDR `/16` (vd: `10.0.0.0/16`)
+- 3 Availability Zones (AZ)
+- Public Subnets (cho ALB, NAT Gateway, Bastion)
+- Private Subnets (cho EC2 Backend/App)
+- Database Subnets (biệt lập không route rathứ nào trừ App Subnet)
+
+## Khởi tạo Terraform project
+
+```hcl
+# provider.tf
+provider "aws" {
+  region = "ap-southeast-1" # Singapore
+}
+```
+
+## Định nghĩa VPC Module
+
+Chúng ta sẽ sử dụng Module chính chủ từ registry:
+
+```hcl
+module "vpc" {
+  source = "terraform-aws-modules/vpc/aws"
+
+  name = "production-vpc"
+  cidr = "10.0.0.0/16"
+
+  azs             = ["ap-southeast-1a", "ap-southeast-1b", "ap-southeast-1c"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+  database_subnets = ["10.0.201.0/24", "10.0.202.0/24", "10.0.203.0/24"]
+
+  enable_nat_gateway = true
+  single_nat_gateway = false
+  one_nat_gateway_per_az = true
+
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = {
+    Environment = "prod"
+    Terraform   = "true"
+  }
+}
+```
+
+## Chú ý quan trọng khi dùng NAT
+
+Việc bật `one_nat_gateway_per_az = true` giúp đảm bảo High Availablility vì nếu một Data Center bị sập, các instance ở subnet private bên AZ khác vẫn có đường ra Internet. Tuy nhiên, NAT Gateway trên AWS được tính tiền theo giờ và phí truyền tải, rất đắt.
+
+*Trick cho Test environment:* Dán `single_nat_gateway = true` để tiết kiệm.

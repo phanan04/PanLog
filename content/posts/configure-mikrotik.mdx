@@ -1,0 +1,51 @@
+---
+title: "Hướng dẫn Route Vlan MikroTik & IP WAN Động"
+date: "2024-03-05"
+category: "Network"
+tags: ["mikrotik", "routeros", "vlan"]
+excerpt: "Cấu hình chia VLAN nội bộ, định tuyến Router trên lõi (Router on a Stick) và tối ưu hóa xử lý gói tin cho Fiber Internet."
+---
+
+# Lộ Trình Mạng MikroTik
+
+Dành cho kĩ thuật quản lý thiết bị MikroTik, đặc biệt qua môi trường RouterOS (ROS 7.0+).
+
+## Tạo VLAN Subinterface
+
+Trên MikroTik, một VLAN interface phải gắn chặt vào Bridge chính hoặc master interface (như sfpplus1, ether1). Cấu hình trên terminal:
+
+```routeros
+/interface vlan
+add interface=bridge name=vlan10_guest vlan-id=10
+add interface=bridge name=vlan20_mgmt vlan-id=20
+```
+
+## IP Address Allocation
+
+```routeros
+/ip address
+add address=192.168.10.1/24 interface=vlan10_guest
+add address=10.0.0.1/24 interface=vlan20_mgmt
+```
+
+## Khai báo DHCP Server cho các VLAN
+
+Vì DHCP Setup Wizard yêu cầu IP Pool nên việc chạy thủ công các dòng này nhanh hơn:
+
+```routeros
+# Tạo pool
+/ip pool add name=dhcp_pool10 ranges=192.168.10.100-192.168.10.254
+
+# Trỏ DHCP Server tới pool và interface
+/ip dhcp-server add address-pool=dhcp_pool10 interface=vlan10_guest name=dhcp10
+/ip dhcp-server network add address=192.168.10.0/24 dns-server=8.8.8.8,1.1.1.1 gateway=192.168.10.1
+```
+
+## NAT Traffic to the Internet (PPPoE Interface)
+
+Đây là Masked NAT, đảm bảo mọi VLAN đều có thể được SNAT ra ngoài Internet thông qua giao diện quang PPPoE Client.
+
+```routeros
+/ip firewall nat
+add action=masquerade chain=srcnat out-interface=pppoe-out1
+```

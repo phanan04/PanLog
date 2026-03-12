@@ -1,0 +1,65 @@
+---
+title: "Hướng dẫn cài đặt Proxmox VE 8 trên Bare Metal"
+date: "2024-03-12"
+category: "SysAdmin"
+tags: ["proxmox", "virtualization", "linux"]
+excerpt: "Các bước chi tiết để thiết lập một server ảo hóa Proxmox VE 8 từ đầu, bao gồm cấu hình network và storage cơ bản."
+---
+
+# Giới thiệu
+
+Proxmox VE (Virtual Environment) là một nền tảng quản lý ảo hóa cấp doanh nghiệp mã nguồn mở, hỗ trợ KVM và LXC.
+
+## Yêu cầu phần cứng
+
+- CPU x86_64 có hỗ trợ ảo hóa (Intel VT/AMD-V)
+- Tối thiểu 4GB RAM (Khuyến nghị 8GB+)
+- 1 ổ SSD/NVMe để cài HĐH
+- 1 USB Boot (>4GB)
+
+## Bước 1: Tạo USB Boot
+
+Tải file ISO từ trang chủ Proxmox. Sử dụng BalenaEtcher hoặc Rufus (chọn chế độ DD) để tạo USB boot.
+
+## Bước 2: Quá trình cài đặt
+
+1. Cắm USB vào máy chủ và chọn Boot từ USB.
+2. Tại menu Grub, chọn **Install Proxmox VE**.
+3. Đồng ý với thỏa thuận người dùng (EULA).
+4. Chọn ổ cứng đích. **Lưu ý:** Dữ liệu trên ổ này sẽ bị xóa sạch!
+5. Nhập thông tin quốc gia, múi giờ và Keyboard Layout.
+6. Cấu hình mật khẩu root và email quản trị.
+
+### Cấu hình Network
+
+Đây là bước quan trọng, IP của Proxmox nên là IP tĩnh (Static IP):
+
+```bash
+# File cấu hình mẫu /etc/network/interfaces sau khi cài xong:
+auto lo
+iface lo inet loopback
+
+iface eno1 inet manual
+
+auto vmbr0
+iface vmbr0 inet static
+        address 192.168.1.100/24
+        gateway 192.168.1.1
+        bridge-ports eno1
+        bridge-stp off
+        bridge-fd 0
+```
+
+## Bước 3: Đăng nhập Web GUI
+
+Sau khi khởi động lại, truy cập Web GUI qua địa chỉ:
+`https://<IP_DA_CAU_HINH>:8006`
+
+(Lưu ý: Bạn cần chấp nhận cảnh báo SSL do Proxmox dùng self-signed certificate mặc định).
+
+```powershell
+Administrator@PanLog ~
+$ ping 192.168.1.100
+Pinging 192.168.1.100 with 32 bytes of data:
+Reply from 192.168.1.100: bytes=32 time<1ms TTL=64
+```
